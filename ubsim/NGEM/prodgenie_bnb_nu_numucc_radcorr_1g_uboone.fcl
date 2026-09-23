@@ -1,0 +1,35 @@
+#include "prodgenie_common_uboone.fcl"
+
+// this fhicl runs GENIE, then adds a QED radiative-correction photon collinear
+// with the outgoing muon of numuCC events, sampled from the collinear function of
+// Tomalak et al., Phys. Rev. D 106, 093006 (2022), Eqs. (35)-(36)
+
+process_name: GenieGen
+
+outputs.out1.fileName: "prodgenie_bnb_nu_numucc_radcorr_1g_uboone_%tc_gen.root"
+
+source.maxEvents: 500
+
+physics.producers.generator: @local::microboone_genie_simple
+physics.producers.generator.GlobalTimeOffset: 3125.
+physics.producers.generator.RandomTimeOffset: 1600.
+physics.producers.generator.TopVolume: "volCryostat"
+physics.producers.generator.BeamName: "booster"
+
+physics.producers.generator.module_type: "GENIEGenNGEM"
+physics.producers.generator.AddRadCorrPhoton: true
+physics.producers.generator.RadCorrLeptonPdg: 13        # |pdg| of the CC lepton (13 = numuCC and anti-numuCC)
+physics.producers.generator.RadCorrDeltaE: 0.020        # GeV, minimum photon energy (soft-photon cutoff)
+physics.producers.generator.RadCorrMaxAngle: 60.        # degrees, maximum muon-photon opening angle
+
+// RadCorrForceEmission: false -> a photon is added with the physical probability P(E_tree),
+//                                so the sample is unweighted (per-POT normalization is correct)
+// RadCorrForceEmission: true  -> every eligible event gets a photon, with the photon
+//                                MCParticle weight set to P(E_tree), to be applied as an event weight
+physics.producers.generator.RadCorrForceEmission: false
+
+// only keep interactions in which a photon was added (other interactions are skipped like a filter,
+// their POT is still counted)
+physics.producers.generator.RadCorrRequireRadiation: true
+
+#physics.producers.generator.RadCorrRandomSeed: 5      # default is 0 (unique seed from ROOT)

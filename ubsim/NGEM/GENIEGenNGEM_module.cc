@@ -68,6 +68,7 @@
 #include "DeleteOneRandomPhoton.h"
 #include "GenerateIsotropicSinglePhoton.h"
 #include "ModifyParticle.h"
+#include "AddRadCorrCollinearPhoton.h"
 
 ///Event Generation using GENIE, cosmics or single particles
 namespace evgen {
@@ -182,6 +183,14 @@ namespace evgen {
     bool fManuallyDecayModifiedPi0s; ///< whether to manually decay pi0s after modification. must use if mass is modified.
     bool fDeleteRandomModifiedGamma; ///< whether to delete a random gamma after modification. 
 
+    bool fAddRadCorrPhoton; ///< whether to add a QED radiative-correction photon collinear with the CC lepton (PRD 106, 093006)
+    int fRadCorrLeptonPdg; ///< |pdg| of the CC lepton to radiate from (13 for numuCC)
+    double fRadCorrDeltaE; ///< soft-photon cutoff, minimum simulated photon energy (GeV)
+    double fRadCorrMaxAngle; ///< maximum lepton-photon opening angle (degrees)
+    bool fRadCorrForceEmission; ///< always add a photon and store the emission probability as the photon MCParticle weight
+    bool fRadCorrRequireRadiation; ///< only keep events in which a photon was added
+    TRandom3 fRadCorrRandom; ///< random generator for the radiative-correction photon
+
   };
 }
 
@@ -211,6 +220,13 @@ namespace evgen{
     , fModifyParticleRandomSeed(pset.get<int>("ModifyParticleRandomSeed", 0))
     , fManuallyDecayModifiedPi0s(pset.get<bool>("ManuallyDecayModifiedPi0s", false))
     , fDeleteRandomModifiedGamma(pset.get<bool>("DeleteRandomModifiedGamma", false))
+    , fAddRadCorrPhoton(pset.get<bool>("AddRadCorrPhoton", false))
+    , fRadCorrLeptonPdg(pset.get<int>("RadCorrLeptonPdg", 13))
+    , fRadCorrDeltaE(pset.get<double>("RadCorrDeltaE", 0.020))
+    , fRadCorrMaxAngle(pset.get<double>("RadCorrMaxAngle", 60.))
+    , fRadCorrForceEmission(pset.get<bool>("RadCorrForceEmission", false))
+    , fRadCorrRequireRadiation(pset.get<bool>("RadCorrRequireRadiation", false))
+    , fRadCorrRandom(pset.get<unsigned int>("RadCorrRandomSeed", 0)) // 0 = unique seed from ROOT
   {
     fStopwatch.Start();
 
@@ -528,6 +544,31 @@ namespace evgen{
         std::cout << std::endl;
       }
     }
+
+	  if (fAddRadCorrPhoton) {
+	    std::cout << "Adding radiative-correction collinear photon" << std::endl;
+	    bool radiated = false;
+	    AddRadCorrCollinearPhoton(fRadCorrLeptonPdg, fRadCorrDeltaE, fRadCorrMaxAngle, fRadCorrForceEmission, fRadCorrRandom, truth, radiated);
+	    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
+	    for (int i = 0; i < truth.NParticles(); ++i) {
+	      std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
+	      std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
+	      std::cout << ", mother: " << truth.GetParticle(i).Mother();
+	      std::cout << ", mass: " << truth.GetParticle(i).Mass();
+	      std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
+	      std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
+	      std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
+	      std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
+	      std::cout << ", process: " << truth.GetParticle(i).Process();
+	      std::cout << ", weight: " << truth.GetParticle(i).Weight();
+	      std::cout << std::endl;
+	    }
+	    if (fRadCorrRequireRadiation && !radiated) {
+	      // drop this interaction; the POT is still counted, like a filter
+	      std::cout << "No radiative-correction photon added, skipping this interaction" << std::endl;
+	      continue;
+	    }
+	  }
 
 	  truthcol ->push_back(truth);
 	  fluxcol  ->push_back(flux);
