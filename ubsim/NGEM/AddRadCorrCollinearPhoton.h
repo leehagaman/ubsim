@@ -44,9 +44,11 @@ namespace evgen {
   //   forceEmission = true:  a photon is always added (when P > 0), and the photon's
   //     MCParticle::Weight() is set to P, the weight to apply to the event.
   //
+  // verbose = true also prints a line for every interaction, not just when a photon is added.
+  //
   // Returns P (0 if the event is not eligible). radiated is set true if a photon was added.
   inline double AddRadCorrCollinearPhoton(int leptonPdg, double deltaE, double maxAngleDeg,
-                                          bool forceEmission, TRandom3& randomGen,
+                                          bool forceEmission, bool verbose, TRandom3& randomGen,
                                           simb::MCTruth& originalMCTruth, simb::MCTruth& newMCTruth,
                                           bool& radiated) {
     radiated = false;
@@ -69,9 +71,9 @@ namespace evgen {
     if (lepton_index >= 0) {
       const simb::MCParticle& lepton = originalMCTruth.GetParticle(lepton_index);
       prob = radcorr::RadiationProbability(lepton.E(), lepton.Mass(), deltaE, maxAngleRad);
-      std::cout << "Rad corr: lepton pdg " << lepton.PdgCode() << " at index " << lepton_index
+      if (verbose) std::cout << "Rad corr: lepton pdg " << lepton.PdgCode() << " at index " << lepton_index
                 << ", E_tree = " << lepton.E() << " GeV, emission probability = " << prob << std::endl;
-    } else {
+    } else if (verbose) {
       std::cout << "Rad corr: no CC lepton with |pdg| " << leptonPdg << " found, not adding a photon" << std::endl;
     }
 
@@ -150,7 +152,7 @@ namespace evgen {
       gamma.AddTrajectoryPoint(lepton.Position(), gamma_momentum);
       newMCTruth.Add(gamma);
 
-      std::cout << "Rad corr: added photon, x = " << x << ", eta = " << eta
+      std::cout << "Rad corr: added photon, E_tree = " << E_tree << " GeV, emission probability = " << prob << ", x = " << x << ", eta = " << eta
                 << ", E_gamma = " << E_gamma << " GeV, opening angle = " << opening_angle * TMath::RadToDeg() << " deg" << std::endl;
       TLorentzVector diff = lepton.Momentum() - lep_momentum - gamma_momentum;
       std::cout << "Rad corr: (tree lepton - radiated lepton - photon) 4-momentum: ("
@@ -177,10 +179,10 @@ namespace evgen {
 
   // In-place convenience wrapper
   inline double AddRadCorrCollinearPhoton(int leptonPdg, double deltaE, double maxAngleDeg,
-                                          bool forceEmission, TRandom3& randomGen,
+                                          bool forceEmission, bool verbose, TRandom3& randomGen,
                                           simb::MCTruth& mcTruth, bool& radiated) {
     simb::MCTruth newTruth;
-    double prob = AddRadCorrCollinearPhoton(leptonPdg, deltaE, maxAngleDeg, forceEmission, randomGen, mcTruth, newTruth, radiated);
+    double prob = AddRadCorrCollinearPhoton(leptonPdg, deltaE, maxAngleDeg, forceEmission, verbose, randomGen, mcTruth, newTruth, radiated);
     mcTruth = newTruth;
     return prob;
   }

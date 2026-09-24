@@ -60,6 +60,7 @@
 #include "dk2nu/genie/GDk2NuFlux.h"
 
 #include "GENIE/Framework/EventGen/EventRecord.h"
+#include "GENIE/Framework/Messenger/Messenger.h"
 #include "nutools/EventGeneratorBase/GENIE/EVGBAssociationUtil.h"
 #include "nutools/EventGeneratorBase/evgenbase.h"
 
@@ -120,6 +121,7 @@ namespace evgen {
     std::string ReactionChannel(int ccnc,int mode);
     
     void FillHistograms(simb::MCTruth mc);
+    void PrintParticles(const simb::MCTruth& truth) const;
 
     evgb::GENIEHelper  *fGENIEHelp;       ///< GENIEHelper object
     bool fDefinedVtxHistRange;///use defined hist range; it is useful to have for asymmetric ranges like in DP FD.
@@ -183,6 +185,9 @@ namespace evgen {
     bool fManuallyDecayModifiedPi0s; ///< whether to manually decay pi0s after modification. must use if mass is modified.
     bool fDeleteRandomModifiedGamma; ///< whether to delete a random gamma after modification. 
 
+    bool fPrintParticles; ///< whether to print the full particle list of every interaction (and after each modification)
+    std::vector<std::string> fGENIEQuietStreams; ///< GENIE message streams to raise to WARN, e.g. ["ResonanceDecay", "Pythia6Decay"]
+
     bool fAddRadCorrPhoton; ///< whether to add a QED radiative-correction photon collinear with the CC lepton (PRD 106, 093006)
     int fRadCorrLeptonPdg; ///< |pdg| of the CC lepton to radiate from (13 for numuCC)
     double fRadCorrDeltaE; ///< soft-photon cutoff, minimum simulated photon energy (GeV)
@@ -220,6 +225,8 @@ namespace evgen{
     , fModifyParticleRandomSeed(pset.get<int>("ModifyParticleRandomSeed", 0))
     , fManuallyDecayModifiedPi0s(pset.get<bool>("ManuallyDecayModifiedPi0s", false))
     , fDeleteRandomModifiedGamma(pset.get<bool>("DeleteRandomModifiedGamma", false))
+    , fPrintParticles(pset.get<bool>("PrintParticles", true))
+    , fGENIEQuietStreams(pset.get<std::vector<std::string>>("GENIEQuietStreams", std::vector<std::string>()))
     , fAddRadCorrPhoton(pset.get<bool>("AddRadCorrPhoton", false))
     , fRadCorrLeptonPdg(pset.get<int>("RadCorrLeptonPdg", 13))
     , fRadCorrDeltaE(pset.get<double>("RadCorrDeltaE", 0.020))
@@ -295,6 +302,12 @@ namespace evgen{
   //____________________________________________________________________________
   void GENIEGenNGEM::beginJob(){
     fGENIEHelp->Initialize();
+
+    // these GENIE streams print several lines for every interaction, which adds up when
+    // most interactions are thrown away (e.g. RadCorrRequireRadiation)
+    for (const std::string& stream : fGENIEQuietStreams) {
+      genie::Messenger::Instance()->SetPriorityLevel(stream.c_str(), log4cpp::Priority::WARN);
+    }
 
     fPrevTotPOT = 0.;
     fPrevTotGoodPOT = 0.;
@@ -440,19 +453,7 @@ namespace evgen{
 	// would never see anyway.
 	if(fGENIEHelp->Sample(truth, flux, gTruth)){
 
-	  std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-	  for (int i = 0; i < truth.NParticles(); ++i) {
-	    std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-	    std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-	    std::cout << ", mother: " << truth.GetParticle(i).Mother();
-	    std::cout << ", mass: " << truth.GetParticle(i).Mass();
-	    std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-	    std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-	    std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-	    std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-	    std::cout << ", process: " << truth.GetParticle(i).Process();
-	    std::cout << std::endl;
-	  }
+	  if (fPrintParticles) PrintParticles(truth);
 
 	  if (GenerateIsotropicSinglePhoton) {
 	    std::cout << "Generating isotropic single photon" << std::endl;
@@ -461,55 +462,19 @@ namespace evgen{
 						  SinglePhotonCosThetaBinEdges, SinglePhotonCosThetaBinProbs,
         truth
 						  );
-	    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-	    for (int i = 0; i < truth.NParticles(); ++i) {
-	      std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-	      std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-	      std::cout << ", mother: " << truth.GetParticle(i).Mother();
-	      std::cout << ", mass: " << truth.GetParticle(i).Mass();
-	      std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-	      std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-	      std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-	      std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-	      std::cout << ", process: " << truth.GetParticle(i).Process();
-	      std::cout << std::endl;
-	    }
+	    if (fPrintParticles) PrintParticles(truth);
 	  }
 
 	  if (ManuallyDecayPi0s) {
 	    std::cout << "Manually decaying pi0s" << std::endl;
 	    ManuallyDecayPi0sToTwoPhotons(truth);
-	    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-	    for (int i = 0; i < truth.NParticles(); ++i) {
-	      std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-	      std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-	      std::cout << ", mother: " << truth.GetParticle(i).Mother();
-	      std::cout << ", mass: " << truth.GetParticle(i).Mass();
-	      std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-	      std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-	      std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-	      std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-	      std::cout << ", process: " << truth.GetParticle(i).Process();
-	      std::cout << std::endl;
-	    }
+	    if (fPrintParticles) PrintParticles(truth);
 	  }
 
 	  if (DeleteRandomGamma) {
 	    std::cout << "Deleting random gamma" << std::endl;
 	    DeleteOneRandomPhoton(truth);
-	    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-	    for (int i = 0; i < truth.NParticles(); ++i) {
-	      std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-	      std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-	      std::cout << ", mother: " << truth.GetParticle(i).Mother();
-	      std::cout << ", mass: " << truth.GetParticle(i).Mass();
-	      std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-	      std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-	      std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-	      std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-	      std::cout << ", process: " << truth.GetParticle(i).Process();
-	      std::cout << std::endl;
-	    }
+	    if (fPrintParticles) PrintParticles(truth);
 	  }
 
     if (fModifyParticle) {
@@ -530,42 +495,17 @@ namespace evgen{
           DeleteOneRandomPhoton(truth);
         }
       }
-      std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-      for (int i = 0; i < truth.NParticles(); ++i) {
-        std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-        std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-        std::cout << ", mother: " << truth.GetParticle(i).Mother();
-        std::cout << ", mass: " << truth.GetParticle(i).Mass();
-        std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-        std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-        std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-        std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-        std::cout << ", process: " << truth.GetParticle(i).Process();
-        std::cout << std::endl;
-      }
+      if (fPrintParticles) PrintParticles(truth);
     }
 
 	  if (fAddRadCorrPhoton) {
-	    std::cout << "Adding radiative-correction collinear photon" << std::endl;
+	    if (fPrintParticles) std::cout << "Adding radiative-correction collinear photon" << std::endl;
 	    bool radiated = false;
-	    AddRadCorrCollinearPhoton(fRadCorrLeptonPdg, fRadCorrDeltaE, fRadCorrMaxAngle, fRadCorrForceEmission, fRadCorrRandom, truth, radiated);
-	    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
-	    for (int i = 0; i < truth.NParticles(); ++i) {
-	      std::cout << "    pdg: " << truth.GetParticle(i).PdgCode();
-	      std::cout << ", track_id: " << truth.GetParticle(i).TrackId();
-	      std::cout << ", mother: " << truth.GetParticle(i).Mother();
-	      std::cout << ", mass: " << truth.GetParticle(i).Mass();
-	      std::cout << ", position: (" << truth.GetParticle(i).Vx() << ", " << truth.GetParticle(i).Vy() << ", " << truth.GetParticle(i).Vz() << ")";
-	      std::cout << ", momentum: (" << truth.GetParticle(i).Px() << ", " << truth.GetParticle(i).Py() << ", " << truth.GetParticle(i).Pz() << ")";
-	      std::cout << ", Gvtx: (" << truth.GetParticle(i).Gvx() << ", " << truth.GetParticle(i).Gvy() << ", " << truth.GetParticle(i).Gvz() << ", " << truth.GetParticle(i).Gvt() << ")";
-	      std::cout << ", status code: " << truth.GetParticle(i).StatusCode();
-	      std::cout << ", process: " << truth.GetParticle(i).Process();
-	      std::cout << ", weight: " << truth.GetParticle(i).Weight();
-	      std::cout << std::endl;
-	    }
+	    AddRadCorrCollinearPhoton(fRadCorrLeptonPdg, fRadCorrDeltaE, fRadCorrMaxAngle, fRadCorrForceEmission, fPrintParticles, fRadCorrRandom, truth, radiated);
+	    if (fPrintParticles) PrintParticles(truth);
 	    if (fRadCorrRequireRadiation && !radiated) {
 	      // drop this interaction; the POT is still counted, like a filter
-	      std::cout << "No radiative-correction photon added, skipping this interaction" << std::endl;
+	      if (fPrintParticles) std::cout << "No radiative-correction photon added, skipping this interaction" << std::endl;
 	      continue;
 	    }
 	  }
@@ -642,6 +582,26 @@ namespace evgen{
     evt.put(std::move(nuchoiceassn));
 
     return;
+  }
+
+  //......................................................................
+  void GENIEGenNGEM::PrintParticles(const simb::MCTruth& truth) const
+  {
+    std::cout << "truth.NParticles(): " << truth.NParticles() << std::endl;
+    for (int i = 0; i < truth.NParticles(); ++i) {
+      const simb::MCParticle& part = truth.GetParticle(i);
+      std::cout << "    pdg: " << part.PdgCode();
+      std::cout << ", track_id: " << part.TrackId();
+      std::cout << ", mother: " << part.Mother();
+      std::cout << ", mass: " << part.Mass();
+      std::cout << ", position: (" << part.Vx() << ", " << part.Vy() << ", " << part.Vz() << ")";
+      std::cout << ", momentum: (" << part.Px() << ", " << part.Py() << ", " << part.Pz() << ")";
+      std::cout << ", Gvtx: (" << part.Gvx() << ", " << part.Gvy() << ", " << part.Gvz() << ", " << part.Gvt() << ")";
+      std::cout << ", status code: " << part.StatusCode();
+      std::cout << ", process: " << part.Process();
+      std::cout << ", weight: " << part.Weight();
+      std::cout << std::endl;
+    }
   }
 
   //......................................................................
