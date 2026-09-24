@@ -31,8 +31,12 @@ namespace evgen {
   // The radiated lepton and photon are placed so that their summed momentum
   // stays along the original lepton direction, with the sampled opening angle
   // between them and a uniformly random azimuth around that axis. Energy is
-  // conserved exactly; the jet 3-momentum magnitude changes at O(m_lep^2 / E),
-  // which is left to the (unmodified) hadronic system.
+  // conserved exactly, but the lepton + photon system has invariant mass
+  //   M^2 = m_lep^2 + 2 E_gamma (E_lep' - p_lep' cos(opening angle)) > m_lep^2,
+  // so its 3-momentum magnitude is smaller than the tree-level lepton's. This is
+  // negligible for small opening angles, but reaches tens of MeV for wide-angle
+  // photons near maxAngleDeg. The missing momentum is not given to the
+  // (unmodified) hadronic system.
   //
   // Emission modes:
   //   forceEmission = false: a photon is added with probability P(E_tree), where P is
