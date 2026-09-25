@@ -4,7 +4,9 @@
 // with the outgoing muon of numuCC events, sampled from the collinear function of
 // Tomalak et al., Phys. Rev. D 106, 093006 (2022), Eqs. (35)-(36)
 
-process_name: GenieGen
+// standard_overlay_gen_SimInfoMixer_prod.fcl mixes in the MCTruth etc. from "generator::GenieGenFiltered",
+// so the process name must match (otherwise no neutrino interactions are mixed into the data events)
+process_name: GenieGenFiltered
 
 outputs.out1.fileName: "prodgenie_bnb_nu_numucc_radcorr_1g_uboone_%tc_gen.root"
 
